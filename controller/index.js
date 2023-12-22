@@ -15,7 +15,7 @@ client.connect()
 
 const login = (req, res) => {
     const sql = 'SELECT * FROM users WHERE email = $1 AND password= $2';
-
+    console.log(req.body);
     client.query(sql, [req.body.email, req.body.password], (err, data) => {
         if (err)
             res.json(err);
@@ -38,7 +38,7 @@ const login = (req, res) => {
                 id: data.rows[0].id,
                 email: data.rows[0].email
             }, process.env.REFRESH_SECRET, {
-                expiresIn: '24h',    // 유효기간
+                expiresIn: '2m',    // 유효기간
                 issuer: 'About Tech' // 발행자
             })
 
@@ -53,24 +53,25 @@ const login = (req, res) => {
                 httpOnly: true,  // js와 http중 어디서 접근할지 지정(true=js접근 불가)
             })
 
-            res.status(200).json(data);
+            res.status(200).json({ userId: data.rows[0].email, isLogin: true });
         } else {
-            res.json({ success: "failed" });
+            res.json({ isLogin: false });
         }
     })
 };
 
 const accessToken = (req, res) => {
     try {
+        console.log(req);
         const token = req.cookies.accessToken;
         const data = jwt.verify(token, process.env.ACCESS_SECRET);
         const query = "SELECT user_id,email FROM users WHERE email = $1";
 
         client.query(query, [data.email], (err, result) => {
-            res.status(200).json({ userInfo: result.rows[0] });
+            res.status(200).json(result.rows[0]);
         });
     } catch (error) {
-        res.status(500).json(error);
+        res.status(401).json(error);
     }
 };
 
@@ -98,27 +99,30 @@ const refreshToken = (req, res) => {
             res.status(200).json("Access Token recreated :)");
         });
     } catch (error) {
-        res.status(500).json(error);
+        res.status(401).json(error);
     }
 };
 
 const loginSuccess = (req, res) => {
     try {
+        console.log(req.cookies);
+
         const token = req.cookies.accessToken;
         const data = jwt.verify(token, process.env.ACCESS_SECRET);
         const query = "SELECT user_id,email FROM users WHERE email = $1";
 
-        client.query(query, [data.email], (err, result) => {
-
-            res.status(200).json(result.rows[0]);
+        client.query(query, [data.email], (err, data) => {
+            res.status(200).json({ userId: data.rows[0].email, isToken: true });
         });
-    } catch (error) {
-        res.status(500).json(error);
+    } catch (err) {
+        console.log("토큰만료")
+        res.status(401).json(err);
     }
 };
 
 const logout = (req, res) => {
     try {
+        console.log(req.cookies);
         const token = req.cookies.refreshToken;
         // const data = jwt.verify(token, process.env.ACCESS_SECRET);
         res.clearCookie('accessToken');
